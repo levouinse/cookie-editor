@@ -2,6 +2,7 @@ import { CookieHandlerDevtools } from '../devtools/cookieHandlerDevtools.js';
 import { AdHandler } from '../lib/ads/adHandler.js';
 import { Animate } from '../lib/animate.js';
 import { BrowserDetector } from '../lib/browserDetector.js';
+import { ClipboardHelper } from '../lib/clipboardHelper.js';
 import { Cookie } from '../lib/cookie.js';
 import { GenericStorageHandler } from '../lib/genericStorageHandler.js';
 import { HeaderstringFormat } from '../lib/headerstringFormat.js';
@@ -72,6 +73,42 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
       console.log('removing cookie...');
       const listElement = e.target.closest('li');
       removeCookie(listElement.dataset.name);
+      return false;
+    }
+
+    /**
+     * Handles clicks on the copy button of a cookie.
+     * @param {Element} e Copy button element.
+     * @return {false} returns false to prevent click event propagation.
+     */
+    async function copyCookieButton(e) {
+      e.preventDefault();
+      const listElement = e.target.closest('li');
+      const cookieId = listElement.id;
+      const cookie = loadedCookies[cookieId];
+
+      if (!cookie) {
+        sendNotification('Cookie not found');
+        return false;
+      }
+
+      const cookieData = JSON.stringify(cookie.cookie, null, 2);
+      const success = await ClipboardHelper.copy(cookieData);
+
+      if (success) {
+        sendNotification(`Cookie "${cookie.cookie.name}" copied to clipboard`);
+        // Visual feedback
+        const button = e.target.closest('button');
+        const icon = button.querySelector('use');
+        const originalHref = icon.getAttribute('href');
+        icon.setAttribute('href', '../sprites/solid.svg#check');
+        setTimeout(() => {
+          icon.setAttribute('href', originalHref);
+        }, 1000);
+      } else {
+        sendNotification('Failed to copy cookie');
+      }
+
       return false;
     }
 
@@ -269,6 +306,9 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
         }
         if (target.classList.contains('save')) {
           return saveCookieForm(e.target.closest('li').querySelector('form'));
+        }
+        if (target.classList.contains('copy-cookie')) {
+          return copyCookieButton(e);
         }
       });
       document.addEventListener('keydown', e => {
@@ -922,7 +962,7 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
   /**
    * Exports all the cookies for the current tab in the JSON format.
    */
-  function exportToJson() {
+  async function exportToJson() {
     hideExportMenu();
     const buttonIcon = document
       .getElementById('export-cookies')
@@ -932,7 +972,7 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
     }
 
     buttonIcon.setAttribute('href', '../sprites/solid.svg#check');
-    copyText(JsonFormat.format(loadedCookies));
+    await copyText(JsonFormat.format(loadedCookies));
 
     sendNotification('Cookies exported to clipboard as JSON');
     setTimeout(() => {
@@ -943,7 +983,7 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
   /**
    * Exports all the cookies for the current tab in the header string format.
    */
-  function exportToHeaderstring() {
+  async function exportToHeaderstring() {
     hideExportMenu();
     const buttonIcon = document
       .getElementById('export-cookies')
@@ -953,7 +993,7 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
     }
 
     buttonIcon.setAttribute('href', '../sprites/solid.svg#check');
-    copyText(HeaderstringFormat.format(loadedCookies));
+    await copyText(HeaderstringFormat.format(loadedCookies));
 
     sendNotification('Cookies exported to clipboard as Header String');
     setTimeout(() => {
@@ -964,7 +1004,7 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
   /**
    * Exports all the cookies for the current tab in the Netscape format.
    */
-  function exportToNetscape() {
+  async function exportToNetscape() {
     hideExportMenu();
     const buttonIcon = document
       .getElementById('export-cookies')
@@ -974,7 +1014,7 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
     }
 
     buttonIcon.setAttribute('href', '../sprites/solid.svg#check');
-    copyText(NetscapeFormat.format(loadedCookies));
+    await copyText(NetscapeFormat.format(loadedCookies));
 
     sendNotification('Cookies exported to clipboard as Netscape format');
     setTimeout(() => {
@@ -1200,19 +1240,14 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
   }
 
   /**
-   * Copy some text to the user's clipboard.
+   * Copy some text to the user's clipboard using modern Clipboard API.
    * @param {string} text Text to copy.
    */
-  function copyText(text) {
-    const fakeText = document.createElement('textarea');
-    fakeText.classList.add('clipboardCopier');
-    fakeText.textContent = text;
-    document.body.appendChild(fakeText);
-    fakeText.focus();
-    fakeText.select();
-    // TODO: switch to clipboard API.
-    document.execCommand('Copy');
-    document.body.removeChild(fakeText);
+  async function copyText(text) {
+    const success = await ClipboardHelper.copy(text);
+    if (!success) {
+      sendNotification('Failed to copy to clipboard');
+    }
   }
 
   /**
