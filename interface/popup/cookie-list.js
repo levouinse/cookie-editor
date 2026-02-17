@@ -605,32 +605,46 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
         mainMenuContent.classList.toggle('visible');
       });
 
+    // Consolidated document click handler
     document.addEventListener('click', function (e) {
-      // Clicks in the main menu should not dismiss it.
+      // Handle main menu blur
       if (
-        document.querySelector('#main-menu').contains(e.target) ||
-        !mainMenuContent.classList.contains('visible')
+        document.querySelector('#main-menu') &&
+        !document.querySelector('#main-menu').contains(e.target) &&
+        mainMenuContent.classList.contains('visible')
       ) {
+        console.log('main menu blur');
+        mainMenuContent.classList.remove('visible');
         return;
       }
-      console.log('main menu blur');
-      mainMenuContent.classList.remove('visible');
-    });
 
-    document.addEventListener('click', function (e) {
+      // Handle export menu blur
       const exportMenu = document.querySelector('#export-menu');
-      // Clicks in the export menu should not dismiss it.
-      if (!exportMenu || exportMenu.contains(e.target)) {
-        return;
-      }
-
       const exportButton = document.querySelector('#export-cookies');
-      if (!exportButton || exportButton.contains(e.target)) {
+      if (
+        exportMenu &&
+        !exportMenu.contains(e.target) &&
+        (!exportButton || !exportButton.contains(e.target))
+      ) {
+        console.log('export menu blur');
+        hideExportMenu();
         return;
       }
 
-      console.log('export menu blur');
-      hideExportMenu();
+      // Handle bulk actions
+      if (e.target.id === 'selectAllCheckbox') {
+        handleSelectAll();
+      } else if (
+        e.target.id === 'bulkDelete' ||
+        e.target.closest('#bulkDelete')
+      ) {
+        handleBulkDelete();
+      } else if (
+        e.target.id === 'bulkExport' ||
+        e.target.closest('#bulkExport')
+      ) {
+        handleBulkExport();
+      }
     });
 
     document
@@ -667,23 +681,6 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
       .addEventListener('click', e => {
         hideNotification();
       });
-
-    // Bulk actions event listeners
-    document.addEventListener('click', e => {
-      if (e.target.id === 'selectAllCheckbox') {
-        handleSelectAll();
-      } else if (
-        e.target.id === 'bulkDelete' ||
-        e.target.closest('#bulkDelete')
-      ) {
-        handleBulkDelete();
-      } else if (
-        e.target.id === 'bulkExport' ||
-        e.target.closest('#bulkExport')
-      ) {
-        handleBulkExport();
-      }
-    });
 
     adjustWidthIfSmaller();
 
