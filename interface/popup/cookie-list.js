@@ -22,6 +22,7 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
   let notificationElement;
   let loadedCookies = {};
   let disableButtons = false;
+  const selectedCookies = new Set();
 
   const notificationQueue = [];
   let notificationTimeout;
@@ -73,6 +74,128 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
       const listElement = e.target.closest('li');
       removeCookie(listElement.dataset.name);
       return false;
+    }
+
+    /**
+     * Handles clicks on the copy button of a cookie.
+     * @param {Element} e Copy button element.
+     * @return {false} returns false to prevent click event propagation.
+     */
+    function copyButton(e) {
+      e.preventDefault();
+      const listElement = e.target.closest('li');
+      const cookieId = listElement.id;
+      const cookie = loadedCookies[cookieId];
+
+      if (cookie) {
+        const cookieJson = JSON.stringify(cookie.cookie, null, 2);
+        copyText(cookieJson);
+        sendNotification('Cookie copied to clipboard');
+      }
+      return false;
+    }
+
+    /**
+     * Handles checkbox click for bulk selection.
+     * @param {Event} e Click event.
+     */
+    function handleCheckboxClick(e) {
+      e.stopPropagation();
+      const checkbox = e.target;
+      const listElement = checkbox.closest('li');
+      const cookieId = listElement.id;
+
+      if (checkbox.checked) {
+        selectedCookies.add(cookieId);
+      } else {
+        selectedCookies.delete(cookieId);
+      }
+
+      updateBulkActionsBar();
+    }
+
+    /**
+     * Updates the bulk actions bar visibility and counter.
+     */
+    function updateBulkActionsBar() {
+      const bulkBar = document.getElementById('bulk-actions-bar');
+      const counter = document.getElementById('bulkCounter');
+      const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+
+      if (!bulkBar) return;
+
+      const count = selectedCookies.size;
+
+      if (count > 0) {
+        bulkBar.style.display = 'block';
+        counter.textContent = `${count} selected`;
+
+        const totalCookies = Object.keys(loadedCookies).length;
+        selectAllCheckbox.checked = count === totalCookies;
+        selectAllCheckbox.indeterminate = count > 0 && count < totalCookies;
+      } else {
+        bulkBar.style.display = 'none';
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      }
+    }
+
+    /**
+     * Handles select all checkbox.
+     */
+    function handleSelectAll() {
+      const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+      const checkboxes = cookiesListHtml.querySelectorAll('.cookie-checkbox');
+
+      if (selectAllCheckbox.checked) {
+        checkboxes.forEach(cb => {
+          cb.checked = true;
+          const cookieId = cb.closest('li').id;
+          selectedCookies.add(cookieId);
+        });
+      } else {
+        checkboxes.forEach(cb => {
+          cb.checked = false;
+        });
+        selectedCookies.clear();
+      }
+
+      updateBulkActionsBar();
+    }
+
+    /**
+     * Handles bulk delete action.
+     */
+    function handleBulkDelete() {
+      if (selectedCookies.size === 0) return;
+
+      const count = selectedCookies.size;
+      for (const cookieId of selectedCookies) {
+        if (loadedCookies[cookieId]) {
+          removeCookie(loadedCookies[cookieId].cookie.name);
+        }
+      }
+
+      selectedCookies.clear();
+      updateBulkActionsBar();
+      sendNotification(`${count} cookies deleted`);
+    }
+
+    /**
+     * Handles bulk export action.
+     */
+    function handleBulkExport() {
+      if (selectedCookies.size === 0) return;
+
+      const selectedCookieData = {};
+      for (const cookieId of selectedCookies) {
+        if (loadedCookies[cookieId]) {
+          selectedCookieData[cookieId] = loadedCookies[cookieId];
+        }
+      }
+
+      copyText(JsonFormat.format(selectedCookieData));
+      sendNotification(`${selectedCookies.size} cookies exported`);
     }
 
     /**
@@ -257,6 +380,9 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
           target = target.parentNode;
         }
 
+        if (target.classList.contains('cookie-checkbox')) {
+          return handleCheckboxClick(e);
+        }
         if (
           target.classList.contains('header') ||
           target.classList.contains('header-name') ||
@@ -266,6 +392,9 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
         }
         if (target.classList.contains('delete')) {
           return deleteButton(e);
+        }
+        if (target.classList.contains('copy')) {
+          return copyButton(e);
         }
         if (target.classList.contains('save')) {
           return saveCookieForm(e.target.closest('li').querySelector('form'));
@@ -538,6 +667,23 @@ import { CookieHandlerPopup } from './cookieHandlerPopup.js';
       .addEventListener('click', e => {
         hideNotification();
       });
+
+    // Bulk actions event listeners
+    document.addEventListener('click', e => {
+      if (e.target.id === 'selectAllCheckbox') {
+        handleSelectAll();
+      } else if (
+        e.target.id === 'bulkDelete' ||
+        e.target.closest('#bulkDelete')
+      ) {
+        handleBulkDelete();
+      } else if (
+        e.target.id === 'bulkExport' ||
+        e.target.closest('#bulkExport')
+      ) {
+        handleBulkExport();
+      }
+    });
 
     adjustWidthIfSmaller();
 
