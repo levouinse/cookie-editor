@@ -101,8 +101,9 @@ export class CookieSearch {
       return text;
     }
 
+    const safeText = text.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const regex = new RegExp(`(${this.escapeRegex(searchTerm)})`, 'gi');
-    return text.replace(regex, '<mark>$1</mark>');
+    return safeText.replace(regex, '<mark>$1</mark>');
   }
 
   /**
